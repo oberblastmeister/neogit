@@ -4,8 +4,8 @@ local input = require 'neogit.lib.input'
 local status = require 'neogit.status'
 local notif = require("neogit.lib.notification")
 local git = require("neogit.lib.git")
-local a = require 'plenary.async_lib'
-local await, async, scheduler = a.await, a.async, a.scheduler
+local a = require 'plenary.async'
+local await, async, scheduler = a.await, a.async, a.util.scheduler
 
 local http_url_patterns = {
   {
@@ -40,8 +40,8 @@ local http_url_patterns = {
   },
 }
 
-local get_remote_url = async(function(remote)
-  local result, code = await(git.cli.remote.push.show_popup(false).get_url(remote).call())
+local get_remote_url = function(remote)
+  local result, code = git.cli.remote.push.show_popup(false).get_url(remote).call()
   if code == 0 then
     local raw_url = result[1]
     if vim.startswith(raw_url, "http") then
@@ -66,10 +66,10 @@ local get_remote_url = async(function(remote)
       error("TODO: unknown protocol")
     end
   else
-    await(scheduler())
+    scheduler()
     notif.create(string.format("Remote '%s' doesn't exist", remote), { type = "error" })
   end
-end)
+end
 
 local construct_url_str = function(url)
   if vim.startswith(url.protocol, "http") then
@@ -93,13 +93,13 @@ local construct_url_str = function(url)
   end
 end
 
-local push_to = async(function(popup, name, remote, branch)
+local push_to = function(popup, name, remote, branch)
   notif.create("Pushing to " .. name)
 
-  local url = await(get_remote_url(remote))
+  local url = get_remote_url(remote)
   if not url then return end
 
-  await(scheduler())
+  scheduler()
   local url_str = construct_url_str(url)
   if not url_str then return end
 
@@ -107,13 +107,13 @@ local push_to = async(function(popup, name, remote, branch)
     and git.cli.push.hide_text(url.password).args(unpack(popup:get_arguments())).args(url_str, branch)
     or git.cli.push.args(unpack(popup:get_arguments())).args(remote, branch)
 
-  local _, code = await(cmd.call())
+  local _, code = cmd.call()
   if code == 0 then
-    await(scheduler())
+    scheduler()
     notif.create("Pushed to " .. name)
-    await(status.refresh(true))
+    status.refresh(true)
   end
-end)
+end
 
 function M.create()
   local p = popup.builder()
@@ -124,10 +124,10 @@ function M.create()
     :switch("h", "no-verify", "Disable hooks")
     :switch("d", "dry-run", "Dry run")
     :action("p", "Push to pushremote", function(popup)
-      await(push_to(popup, "pushremote", "origin", status.repo.head.branch))
+      push_to(popup, "pushremote", "origin", status.repo.head.branch)
     end)
     :action("u", "Push to upstream", function(popup)
-      await(push_to(popup, "upstream", "upstream", status.repo.head.branch))
+      push_to(popup, "upstream", "upstream", status.repo.head.branch)
     end)
     :action("e", "Push to elsewhere", function()
       local remote = input.get_user_input("remote: ")

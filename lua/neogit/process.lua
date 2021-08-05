@@ -1,4 +1,4 @@
-local a = require 'plenary.async_lib'
+local a = require 'plenary.async'
 local wrap = a.wrap
 
 local function trim_newlines(s)
